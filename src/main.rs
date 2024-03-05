@@ -1,13 +1,20 @@
-use itertools::Itertools;
+use itertools::iproduct;
 use std::collections::HashSet;
 
 fn main() {
-    let maximum_length = 6;
+    let maximum_length = 16;
     let actual_roman_numbers = original_roman_numbers(maximum_length);
-    let claimed_valid_strings = claimed_valid_roman_numbers(maximum_length);
+    let claimed_valid_strings = grown_valid_roman_numbers(maximum_length);
 
-    println!("Non-claimed but valid: {:?}", &actual_roman_numbers - &claimed_valid_strings);
-    println!("Invalid but claimed: {:?}", &claimed_valid_strings - &actual_roman_numbers);
+    println!(
+        "Non-claimed but valid: {:?}",
+        &actual_roman_numbers - &claimed_valid_strings
+    );
+
+    println!(
+        "Invalid but claimed: {:?}",
+        &claimed_valid_strings - &actual_roman_numbers
+    );
 }
 
 fn original_roman_numbers(maximum_length: usize) -> HashSet<String> {
@@ -17,21 +24,53 @@ fn original_roman_numbers(maximum_length: usize) -> HashSet<String> {
         .collect()
 }
 
-fn claimed_valid_roman_numbers(maximum_length: usize) -> HashSet<String> {
-    (0..maximum_length)
-        .map(|_| {
-            ["", "I", "V", "X", "L", "C", "D", "M"]
-                .iter()
-                .map(|s| s.to_string())
-        })
-        .multi_cartesian_product()
-        .map(|vector| vector.iter().join(""))
-        .filter(valid_roman_number)
-        .filter(|s| s.len() > 0)
-        .collect()
+fn grown_valid_roman_numbers(maximum_length: usize) -> HashSet<String> {
+    let roman_numerals = ["I", "V", "X", "L", "C", "D", "M"]
+        .iter()
+        .map(|s| s.to_string());
+
+    let mut sets_of_length_n_strings: Vec<HashSet<String>> =
+        vec![HashSet::new(); maximum_length + 1];
+
+    sets_of_length_n_strings[0].insert("".to_string());
+
+    for n in 1..=maximum_length {
+        sets_of_length_n_strings[n] = iproduct!(
+            sets_of_length_n_strings[n - 1].clone(),
+            roman_numerals.clone()
+        )
+        .map(|tuple| format!("{}{}", tuple.0, tuple.1))
+        .filter(|s| valid_roman_number(s))
+        .collect();
+
+        let length = sets_of_length_n_strings[n].len();
+
+        println!(
+            "There {} {} valid string{} of length {}",
+            match length {
+                1 => "is",
+                _ => "are",
+            },
+            length,
+            match length {
+                1 => "",
+                _ => "s",
+            },
+            n
+        );
+    }
+
+    let grown_numbers = sets_of_length_n_strings
+        .iter()
+        .skip(1) // Omit the length 0 string
+        .fold(HashSet::new(), |acc, set| &acc | set);
+
+    println!("There are {} valid strings in total", grown_numbers.len());
+
+    grown_numbers
 }
 
-fn valid_roman_number(v: &String) -> bool {
+fn valid_roman_number(candidate: &str) -> bool {
     ![
         "LD", "VX", "IC", "DD", "VV", "VL", "IM", "DM", "LC", "VD", "IL", "XD", "VM", "XM", "LL",
         "VC", "LM", "ID", "DCD", "XLX", "XXL", "IXC", "CMD", "VIV", "CCM", "CMC", "CMM", "XXC",
@@ -39,7 +78,7 @@ fn valid_roman_number(v: &String) -> bool {
         "IXV", "IVI", "XCX", "IIV", "XCD", "CCCC", "XXXX", "IIII", "MMMM",
     ]
     .iter()
-    .any(|s| v.contains(&s.to_string()))
+    .any(|s| candidate.contains(&s.to_string()))
 }
 
 fn roman_from_decimal(n: usize) -> String {
