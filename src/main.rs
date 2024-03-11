@@ -1,5 +1,15 @@
 use itertools::iproduct;
+use rand::Rng;
+use std::cmp;
 use std::collections::HashSet;
+
+const ROMAN_NUMERALS: &[&str] = &["I", "V", "X", "L", "C", "D", "M"];
+const INVALID_SUBSTRINGS: &[&str] = &[
+    "LD", "VX", "IC", "DD", "VV", "VL", "IM", "DM", "LC", "VD", "IL", "XD", "VM", "XM", "LL", "VC",
+    "LM", "ID", "DCD", "XLX", "XXL", "IXC", "CMD", "VIV", "CCM", "CMC", "CMM", "XXC", "IXX", "DCM",
+    "CDC", "IXI", "XCC", "LXC", "VIX", "XCM", "XCL", "CCD", "IXL", "IIX", "LXL", "IXV", "IVI",
+    "XCX", "IIV", "XCD", "CCCC", "XXXX", "IIII", "MMMM",
+];
 
 fn main() {
     let maximum_length = 16;
@@ -15,6 +25,28 @@ fn main() {
         "Invalid but claimed: {:?}",
         &claimed_valid_strings - &actual_roman_numbers
     );
+
+    println!("\nTest cases in the format `INPUT : VALID, OUTPUTS`.");
+
+    let mut rng = rand::thread_rng();
+    for n in 0..16 {
+        for _ in 0..1_000_000 {
+            let length = rng.gen_range(cmp::max(2, n)..16);
+            let candidate: String = (0..length)
+                .map(|_| ROMAN_NUMERALS[rng.gen_range(0..ROMAN_NUMERALS.len())])
+                .collect();
+            let invalid_substrings = all_invalid_substrings(&candidate);
+            if invalid_substrings.len() == n {
+                let x = invalid_substrings.join(", ");
+                let output = match x.is_empty() {
+                    true => "VALID",
+                    false => &x,
+                };
+                println!("{} : {}", candidate, output);
+                break;
+            }
+        }
+    }
 }
 
 fn original_roman_numbers(maximum_length: usize) -> HashSet<String> {
@@ -25,23 +57,17 @@ fn original_roman_numbers(maximum_length: usize) -> HashSet<String> {
 }
 
 fn grown_valid_roman_numbers(maximum_length: usize) -> HashSet<String> {
-    let roman_numerals = ["I", "V", "X", "L", "C", "D", "M"]
-        .iter()
-        .map(|s| s.to_string());
-
     let mut sets_of_length_n_strings: Vec<HashSet<String>> =
         vec![HashSet::new(); maximum_length + 1];
 
     sets_of_length_n_strings[0].insert("".to_string());
 
     for n in 1..=maximum_length {
-        sets_of_length_n_strings[n] = iproduct!(
-            sets_of_length_n_strings[n - 1].clone(),
-            roman_numerals.clone()
-        )
-        .map(|tuple| format!("{}{}", tuple.0, tuple.1))
-        .filter(|s| valid_roman_number(s))
-        .collect();
+        sets_of_length_n_strings[n] =
+            iproduct!(sets_of_length_n_strings[n - 1].clone(), ROMAN_NUMERALS)
+                .map(|tuple| format!("{}{}", tuple.0, tuple.1))
+                .filter(|s| valid_roman_number(s))
+                .collect();
 
         let length = sets_of_length_n_strings[n].len();
 
@@ -71,14 +97,15 @@ fn grown_valid_roman_numbers(maximum_length: usize) -> HashSet<String> {
 }
 
 fn valid_roman_number(candidate: &str) -> bool {
-    ![
-        "LD", "VX", "IC", "DD", "VV", "VL", "IM", "DM", "LC", "VD", "IL", "XD", "VM", "XM", "LL",
-        "VC", "LM", "ID", "DCD", "XLX", "XXL", "IXC", "CMD", "VIV", "CCM", "CMC", "CMM", "XXC",
-        "IXX", "DCM", "CDC", "IXI", "XCC", "LXC", "VIX", "XCM", "XCL", "CCD", "IXL", "IIX", "LXL",
-        "IXV", "IVI", "XCX", "IIV", "XCD", "CCCC", "XXXX", "IIII", "MMMM",
-    ]
-    .iter()
-    .any(|s| candidate.contains(&s.to_string()))
+    all_invalid_substrings(candidate).is_empty()
+}
+
+fn all_invalid_substrings(candidate: &str) -> Vec<String> {
+    INVALID_SUBSTRINGS
+        .iter()
+        .filter(|s| candidate.contains(&s.to_string()))
+        .map(|s| s.to_string())
+        .collect()
 }
 
 fn roman_from_decimal(n: usize) -> String {
